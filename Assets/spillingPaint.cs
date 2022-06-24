@@ -23,8 +23,12 @@ public class spillingPaint : MonoBehaviour
     private bool moduleSolved;
 
     Colors selectedColor;
-    private List<Colors> placedColors = new List<Colors>();
-    private List<int> placedPositions = new List<int>();
+    private List<int[]> initialPositions = new List<int[]>();
+    private List<int[]> pressedPositions = new List<int[]>();
+    private List<string> initialPosStr = new List<string>();
+    private List<string> pressedPosStr = new List<string>();
+
+
     int spillCount = 0;
 
     int[,] field = new int[,]
@@ -65,6 +69,8 @@ public class spillingPaint : MonoBehaviour
     void FieldPress(int index)
     {
         spillCount++;
+        pressedPositions.Add(new int[2] { index, (int)selectedColor });
+        pressedPosStr.Add((int)selectedColor + "," + index);
         int y = index / 6;
         int x = index % 6;
         for (int y1 = -1; y1 < 2; y1++)
@@ -112,6 +118,8 @@ public class spillingPaint : MonoBehaviour
 
     void ResetPress()
     {
+        pressedPositions = new List<int[]>();
+        pressedPosStr = new List<string>();
         Audio.PlaySoundAtTransform("resetSelectSound", resetButton.transform);
         resetButton.AddInteractionPunch(0.5f);
         spillCount = 0;
@@ -128,8 +136,8 @@ public class spillingPaint : MonoBehaviour
         foreach (int pos in chosenPositions)
         {
             selectedColor = (Colors)UnityEngine.Random.Range(1, 7);
-            placedColors.Add(selectedColor);
-            placedPositions.Add(pos);
+            initialPositions.Add(new int[2] { pos, 7 - ((int)selectedColor) });
+            initialPosStr.Add((7 - (int)selectedColor) + "," + pos);
             FieldPress(pos);
             Debug.LogFormat("[Spilling Paint #{0}] Spilled {1} at position {2} in reading order.", moduleId, selectedColor.ToString(), pos + 1);
             spillCount = 0;
@@ -139,6 +147,8 @@ public class spillingPaint : MonoBehaviour
             puzzle[i / 6, i % 6] = field[i / 6, i % 6];
         }
         resetButton.GetComponent<MeshRenderer>().material = colorMats[0];
+        pressedPositions = new List<int[]>();
+        pressedPosStr = new List<string>();
     }
 
     private static readonly Regex tpRegex = new Regex("^((([abcdef][123456])|[roygbp]|red|orange|yellow|green|blue|purple)( |$))+$");
@@ -183,13 +193,26 @@ public class spillingPaint : MonoBehaviour
 
     IEnumerator TwitchHandleForcedSolve()
     {
-        yield return null;
+        for (int i = 0; i < pressedPosStr.Count; i++)
+        {
+            if (!initialPosStr.Contains(pressedPosStr[i]))
+            {
+                resetButton.OnInteract();
+                yield return new WaitForSeconds(0.2f);
+                break;
+            }
+        }
         for (int i = 0; i < 7; i++)
         {
-            colorSelector[(7 - (int)placedColors[i]) - 1].OnInteract();
-            yield return new WaitForSeconds(0.2f);
-            fieldButtons[placedPositions[i]].OnInteract();
-            yield return new WaitForSeconds(0.2f);
+            if (!pressedPosStr.Contains(initialPosStr[i]))
+            {
+                var a = initialPositions[i][1];
+                colorSelector[a - 1].OnInteract();
+                yield return new WaitForSeconds(0.1f);
+                var b = initialPositions[i][0];
+                fieldButtons[b].OnInteract();
+                yield return new WaitForSeconds(0.2f);
+            }
         }
     }
 }
